@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import classNames from "./ResizableTable.module.css";
-import { DATA, HEADS } from '../data';
+import { DATA, HEADS, HeadItem } from '../data';
 
 type ColumnWidth = {
     width: number;
@@ -36,17 +36,27 @@ const ResizableTable: React.FC = () => {
         }
     }, [containerWidth, tableRef, updateSize]);
 
-    const startResizing = useCallback((index: number, event: React.MouseEvent<HTMLSpanElement>) => {
+    const isResizable = useCallback((resizable?: boolean) => {
+        return typeof resizable === "undefined" ? true : resizable;
+    }, []);
+
+    const startResizing = useCallback((index: number, event: React.MouseEvent<HTMLSpanElement>, item: HeadItem) => {
+        if (!isResizable(item.resizable)) return;
+
         const startX = event.clientX;
         const startWidth = columnWidths[index].width;
 
         const onMouseMove = (e: MouseEvent) => {
             const newWidth = startWidth + (e.clientX - startX);
+            if (item.maxWidth && +item.maxWidth < newWidth) return;
+            if (item.minWidth && +item.minWidth > newWidth) return;
+
             setColumnWidths((prevWidths) => {
                 const updatedWidths = [...prevWidths];
                 updatedWidths[index] = { isTouched: true, width: newWidth };
                 return updatedWidths;
             });
+            
         };
 
         const onMouseUp = () => {
@@ -56,7 +66,7 @@ const ResizableTable: React.FC = () => {
 
         document.addEventListener('mousemove', onMouseMove);
         document.addEventListener('mouseup', onMouseUp);
-    }, [columnWidths]);
+    }, [columnWidths, isResizable]);
 
     return (
         <div className={classNames.TableContainer} ref={tableRef}>
@@ -67,15 +77,17 @@ const ResizableTable: React.FC = () => {
                             <div
                                 key={header.id}
                                 className={classNames.Th}
-                                style={{ width: columnWidths[index].width, minWidth: header?.minWidth }}
+                                style={{ width: columnWidths[index].width }}
                             >
                                 <span className={classNames.HeaderContent}>
                                     {header.label}
                                 </span>
-                                <span
-                                    className={classNames.ResizeHandle}
-                                    onMouseDown={(e) => startResizing(index, e)}
-                                />
+                                {isResizable(header.resizable) && (
+                                    <span
+                                        className={classNames.ResizeHandle}
+                                        onMouseDown={(e) => startResizing(index, e, header)}
+                                    />
+                                )}
                             </div>
                         ))}
                     </div>
@@ -86,7 +98,7 @@ const ResizableTable: React.FC = () => {
                             {HEADS.map((head, index) => (
                                 <div
                                     key={head.id}
-                                    style={{ width: columnWidths[index].width, minWidth: head?.minWidth }}
+                                    style={{ width: columnWidths[index].width }}
                                     className={classNames.Td}
                                 >
                                     {data[head.id]}
